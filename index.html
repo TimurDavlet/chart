@@ -238,15 +238,9 @@
 
       const getTime = () => {
         const now = new Date();
-        let hours = now.getHours();
-        let min = now.getMinutes();
-        if (hours.length == 1) {
-          hours = `0${hours}`;
-        }
-        if (min.length == 1) {
-          min = `0${min}`;
-        }
-        return `${hours}:${min}`;
+        let hours = now.getHours().toString();
+        let min = now.getMinutes().toString();
+        return `${hours.length == 1 ? '0' + hours : hours}:${min.length == 1 ? '0' + min : min}`;
       };
 
       const addData = (label, data) => {
