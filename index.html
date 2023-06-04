@@ -16,6 +16,11 @@
 	  <div id="liveAlertPlaceholder" style="width: 30%;"></div>
     </header>
 	<div class="container">
+    <div class="text-center">
+      <div class="spinner-border" id="loadApp" role="status">
+        <span class="visually-hidden">Загрузка...</span>
+      </div>
+    </div>
 		<div class="">
 			<button type="button" id='add-new-app' class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#exampleModal">
 				Добавить приложение
@@ -73,7 +78,7 @@
 			  	</div>
 			</div>
 		</div>
-		<div style="width: 800px;"><canvas id="chart"></canvas></div>
+		<div style="width: 100%;"><canvas id="chart"></canvas></div>
 	</div>
 	
     <footer>
@@ -86,15 +91,15 @@
 		const addApp = '/Face/New_app';
 
 		var data = {
-				labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+				labels: [],
 				datasets: [{
-					label: "Dataset #1",
+					label: "Запросы к API",
 					backgroundColor: "rgba(255,99,132,0.2)",
 					borderColor: "rgba(255,99,132,1)",
 					borderWidth: 2,
 					hoverBackgroundColor: "rgba(255,99,132,0.4)",
 					hoverBorderColor: "rgba(255,99,132,1)",
-					data: [65, 59, 20, 81, 56, 55, 40],
+					data: [],
 				}]
 			};
 
@@ -122,7 +127,66 @@
 				data: data
 			});
 
+    const apiRequest = (value, userData) => {
+      return fetch(api + value, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json;charset=utf-8'
+        },
+        body: JSON.stringify(userData)
+      }).then((res) => res.json());
+		}
+
+    function alert(message, type) {
+			var wrapper = document.createElement('div')
+			wrapper.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible" role="alert">' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
+			const alertPlaceholder = document.getElementById('liveAlertPlaceholder');
+			alertPlaceholder.append(wrapper);
+		};
+
+    const getTime = () => {
+			const now = new Date();
+			let hours = now.getHours();
+			let min = now.getMinutes();
+      if (hours.length == 1) {
+        hours = `0${hours}`;
+      }
+      if (min.length == 1) {
+        min = `0${min}`;
+      }
+			return `${hours}:${min}`;
+		}
+
+		const addData = (label, data) => {
+			let index = 0;
+			const labelValue = myChart.data.labels;
+			const dataValue = myChart.data.datasets;
+			isNewLabel = !labelValue.includes(label);
+			if (isNewLabel) {
+				myChart.data.labels.push(label);
+				myChart.data.datasets.forEach((dataset) => {
+							dataset.data.push(data);
+						});
+			} else {
+				index = labelValue.indexOf(label);
+        const length = myChart.data.datasets[0].data.length;
+				const lastElem = myChart.data.datasets[0].data[length - 1];
+        myChart.data.datasets[0].data.splice(length - 1, 1, lastElem + data);
+			}
+			myChart.update();
+		};
+
+    const newDataSchedule = () => {
+			const time = getTime();
+			addData(time, 0);
+      setTimeout(() => newDataSchedule(), 60000);
+    }
+
 		const createTable = (myChart) => {
+      let loadApp = document.getElementById('loadApp');
+      if (loadApp.attributes.style != undefined) {
+				loadApp.removeAttribute('style');
+			}
 			$("#liveAlertPlaceholder").empty()
 			let response = fetch(api + getListApp, {
 				method: 'POST',
@@ -150,6 +214,8 @@
 					tbody.append(newElement);
 					count += 1;
 				}
+        $('#loadApp').css("display", "none");
+
 				let exampleModal = document.getElementById('exampleModal');
 				exampleModal.addEventListener('show.bs.modal', function (event) {
 					let button = event.relatedTarget;
@@ -197,23 +263,15 @@
 						idInput.removeAttribute('readonly');
 					}
 				})
-			});
+			}).catch((err) => {
+        console.log(err);
+					alert('При загрузке данных произошла ошибка! Обновите страницу!', 'danger');
+      });
 		};
-
-		const apiRequest = (value, userData) => {
-			return fetch(api + value, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json;charset=utf-8'
-				},
-				body: JSON.stringify(userData)
-			}).then((res) => res.json());
-		}
 
 		const updateApp = () => {
 			const time = getTime();
 			addData(time, 1);
-			console.log(myChart)
 			const modal = document.getElementById('exampleModal');
 			let form = document.getElementById('form1');
 			const formData = new FormData(form);
@@ -231,13 +289,6 @@
 				agent_js_config: appAgentJsConfigs,
 				correlations_config: appCorrelationsConfigs,
 			};
-
-			function alert(message, type) {
-				var wrapper = document.createElement('div')
-				wrapper.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible" role="alert">' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
-				const alertPlaceholder = document.getElementById('liveAlertPlaceholder');
-				alertPlaceholder.append(wrapper);
-			}
 
 			const userData = JSON.stringify(data);
 			let idInput = document.getElementById('app-id');
@@ -275,130 +326,12 @@
 					alert('Изменения не сохранены! Проверьте корректность заполнения полей!', 'danger');
 				});
 			}
-		}
-
-		const getTime = () => {
-			const now = new Date();
-			const hours = now.getHours();
-			const min = now.getMinutes();
-			return `${hours}:${min}`;
-		}
-
-		const addData = (label, data) => {
-			console.log(myChart.data.labels)
-			console.log(myChart.data.datasets)
-			let index = 0;
-			const labelValue = myChart.data.labels;
-			const dataValue = myChart.data.datasets;
-			isNewLabel = !labelValue.includes(label);
-			if (isNewLabel) {
-				myChart.data.labels.push(label);
-				myChart.data.datasets.forEach((dataset) => {
-							dataset.data.push(data);
-						});
-			} else {
-				index = labelValue.indexOf(label);
-				myChart.data.datasets = myChart.data.datasets.data.map((el, i) => {
-					if (i == index) {
-						return el + 1;
-					}
-				});
-			}
-			myChart.update();
-		}
+		};
 
 		$(document).ready(function () {
-			
-
 			createTable(myChart);
-
-			/*setTimeout(() => {
-					function addData(chart, label, data) {
-						let index = 0;
-						const labelValue = chart.data.labels;
-						const dataValue = chart.data.datasets;
-						isNewLabel = !labelValue.includes(label);
-						if (isNewLabel) {
-							chart.data.labels.push(label);
-							chart.data.datasets.data.push(data);
-						} else {
-							index = labelValue.indexOf(label);
-							chart.data.datasets = chart.data.datasets.map((el, i) => {
-								if (i == index) {
-									return el + 1;
-								}
-							});
-						}
-						chart.update();
-
-
-						chart.data.labels.push(label);
-						chart.data.datasets.forEach((dataset) => {
-							dataset.data.push(data);
-						});
-						chart.update();
-					}
-					console.log(myChart)
-					addData(myChart, '22:51', 140)
-				}, 5000)*/
-
-			/*(async function() {
-				const data = [
-					{ time: '21.50', count: 10 },
-					{ time: '21.51', count: 20 },
-					{ time: '21.52', count: 15 },
-					{ time: '21.53', count: 25 },
-					{ time: '21.54', count: 22 },
-					{ time: '21.55', count: 30 },
-					{ time: '21.56', count: 28 },
-				];
-
-
-				
-				new Chart(
-					document.getElementById('acquisitions'),
-					{
-						type: 'bar',
-						options: {
-							animation: false,
-							plugins: {
-								legend: {
-								display: false
-							},
-							tooltip: {
-								enabled: false
-							}
-							}
-						},
-						data: {
-							labels: data.map(row => row.time),
-							datasets: [
-								{
-									label: 'Acquisitions by year',
-									data: data.map(row => row.count)
-								}
-							]
-						}
-					}
-				);
-				})();
-
-				setTimeout(() => {
-					function addData(chart, label, data) {
-						chart.data.labels.push(label);
-						chart.data.datasets.forEach((dataset) => {
-							dataset.data.push(data);
-						});
-						chart.update();
-					}
-
-					addData(Chart, '22:51', 40)
-				}, 5000);*/
-				//chart.data.labels = [10,20,30,40,50,60,70,80,90]
-				//chart.data.datasets = ['22:51','22:52','22:53','22:54','22:55','22:56','22:57','22:58','22:59',]
-				//chart.update()
+      newDataSchedule();
 		});
-			
 	</script>
   </body>
 </html>
